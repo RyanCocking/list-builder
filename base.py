@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
-
 from pydantic import BaseModel, Field
 from typing import List
 
