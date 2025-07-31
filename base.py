@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, Field, model_validator
+from typing import List, Dict, Tuple, Union, Optional
 
 
 class Profile(BaseModel):
@@ -12,62 +12,105 @@ class Profile(BaseModel):
     I: int
     A: int
     Ld: int
+    Int: int
+    Cl: int
+    WP: int
+
+
+class Weapon(BaseModel):
+    name: str
+    points: float
+    description: str | None = None
+
+
+class MissileWeapon(BaseModel):
+    name: str
+    points: float
+    distance: str
+    strength: str
+    save_modifier: str
+    description: str | None = None
+
+
+class Armour(BaseModel):
+    name: str
+    points: float
+    description: str | None = None
+
+
+class MagicStandard(BaseModel):
+    name: str
+    points: float
+    description: str | None = None
 
 
 class Model(BaseModel):
     """A single model"""
-    model_type: str
+    name: str
+    race: str
+    troop_type: str | None = None
+    points: float
+    weapons: List[str]
+    armour: List[str]
     profile: Profile
-    equipment: List[str]
 
 
 class Unit(BaseModel):
     """A group of models"""
-    unit_name: str
+    name: str
     faction: str
-    unit_size: int
+    min_models: int
+    max_models: int
+    options: List[Union[Weapon]]
     models: List[Model]
-    unit_rules: List[str]
+
+    @model_validator(mode='after')
+    def check_model_total(self):
+        if not (self.min_models <= len(self.models) <= self.max_models):
+            raise ValueError(
+                f"Number of models in unit ({len(self.models)}) must be between "
+                f"{self.min_models} and {self.max_models}"
+            )
+        return self
+
 
 # Create BaseModel instances
-unit = Unit(
-    unit_name="High Elf Spearmen",
-    faction="High Elves",
-    unit_size=2,
-    models=[
-        Model(
-            model_type="Spearman",
-            profile=Profile(M=5, WS=4, BS=4, S=3, T=3, W=1, I=5, A=1, Ld=8),
-            equipment=["Spear", "Shield", "Light Armour"]
-        ),
-        Model(
-            model_type="Spearman",
-            profile=Profile(M=5, WS=4, BS=4, S=3, T=3, W=1, I=5, A=1, Ld=8),
-            equipment=["Spear", "Shield", "Light Armour"]
-        )
-    ],
-    unit_rules=["Martial Prowess", "Always Strikes First"]
+clanrat = Model(
+    name = "Clanrat Warrior",
+    race = "Skaven",
+    troop_type = None,
+    points = 7.5,
+    weapons = ["Hand Weapon"],
+    armour = ["Light Armour", "Shield"],
+    profile = Profile(M=5, WS=3, BS=3, S=3, T=3, W=1, I=4, A=1, Ld=6, Int=6, Cl=5, WP=7)
+)
+
+clanrats = Unit(
+    name = "Clanrat Warriors",
+    faction = "Skaven",
+    min_models = 20,
+    max_models = 40,
+    options = (
+        Weapon(name="Spears", points=0.5),
+        Weapon(name="Double-Handed Weapons", points=1)
+    ),
+    models = [clanrat for _ in range(20)]
 )
 
 # Convert to JSON string and save
-json_string = unit.model_dump_json(indent=2)
+json_string = clanrats.model_dump_json(indent=2)
 print(json_string)
 
 with open("unit.json", "w") as f:
     f.write(json_string)
 
 
-# load from JSON string
-unit2 = Unit.model_validate_json(json_string)
+# # load from JSON string
+# unit2 = Unit.model_validate_json(json_string)
 
 
-# Load from JSON file
-with open("unit.json") as f:
-    unit_data = f.read()
+# # Load from JSON file
+# with open("unit.json") as f:
+#     unit_data = f.read()
 
-unit3 = Unit.model_validate_json(unit_data)
-
-
-# Result
-print(unit3.models[0].profile.WS)  # 4
-print(unit3.unit_rules)            # ['Martial Prowess', 'Always Strikes First']
+# unit3 = Unit.model_validate_json(unit_data)
