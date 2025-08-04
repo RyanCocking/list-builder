@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Tuple, Union, Optional
+from typing import List, Dict, Union, Literal
+from copy import deepcopy
 
 
 class Profile(BaseModel):
@@ -17,42 +18,46 @@ class Profile(BaseModel):
     WP: int
 
 
-class Weapon(BaseModel):
+class Equipment(BaseModel):
     name: str
     points: float
+    category: Literal["weapon", "armour"]
     description: str | None = None
 
+    def get_equipment_dict(self):
+        return {self.name: self}
 
-class MissileWeapon(BaseModel):
-    name: str
-    points: float
+
+class MissileWeapon(Equipment):
     distance: str
     strength: str
     save_modifier: str
-    description: str | None = None
 
+EquipmentDict = Dict[str, Equipment]
 
-class Armour(BaseModel):
-    name: str
-    points: float
-    description: str | None = None
+def equipment_from_data(filename) -> EquipmentDict | None:
+    """Generate Equipment objects from input data"""
 
-
-class MagicStandard(BaseModel):
-    name: str
-    points: float
-    description: str | None = None
-
+    # TODO
+    # e.g. a .csv containing ALL skaven equipment
+    # instantiate many Equipment objects and place into a dict
+    # later on, we can get equipment objects using only the name
+    # validation test: all keys are identical to the corresponding Equipment.name
+    return None
 
 class Model(BaseModel):
     """A single model"""
     name: str
     race: str
-    troop_type: str | None = None
     points: float
-    weapons: List[str]  # modified by Unit
-    armour: List[str]   # modified by Unit
+    equipment: EquipmentDict  # modified by Unit
     profile: Profile
+
+    def set_equipment(self, equipment_name:str, equipment: Equipment):
+        self.equipment[equipment_name] = equipment
+
+    def get_equipment(self):
+        return self.equipment
 
 
 class Unit(BaseModel):
@@ -62,59 +67,57 @@ class Unit(BaseModel):
     min_models: int
     max_models: int
     troops: Model
-    options: List  # all possible options
+    troop_type: str | None = None  # elite, levy, etc.
+    options: EquipmentDict  # all possible options
 
     # set by user
     num_models: int = 0
     champion: Model | None = None
 
-    def set_unit_size(self):
-        while True:
-            try:
-                num = int(input("Number of models in unit: "))
-            except ValueError:
-                continue
+    def set_unit_size(self, size: int):
+        if not (self.min_models <= size <= self.max_models):
+            print(f"Must be between {self.min_models} and {self.max_models}")
+        self.num_models = size
 
-            if not (self.min_models <= num <= self.max_models):
-                print(f"Must be between {self.min_models} and {self.max_models}")
-                continue
-            else:
-                self.num_models = num
-                break
+    def _equipment_in_options(self, equipment_name: str):
+        if equipment_name in self.options.keys():
+            return True
+        return False
 
-    def equip_troops(self):
-        """Modify equipment of troops assigned to unit"""
+    def equip_troops(self, equipment_name: str):
+        if not self._equipment_in_options(equipment_name):
+            raise ValueError(f"Equipment '{equipment_name}' not in options for unit '{self.name}'")
+        self.troops.set_equipment(equipment_name, self.options[equipment_name])
 
-        display = "".join([f"{op.name}\t{op.points}\t({i})\n" for i, op in enumerate(self.options)])
+    def unequip_troops(self, equipment_name: str):
+        if not self._equipment_in_options(equipment_name):
+            raise ValueError(f"Equipment '{equipment_name}' not in options for unit '{self.name}'")
+        self.troops.get_equipment().pop(equipment_name)
 
-        while True:
 
-            index = input(f"Select equipment:\n{display}")
+# TODO this data will eventually be read from tabular data, i.e. equipment_from_data(foobar)
+# TODO how to handle equipment costs factored into the base points of the model itself?
+# TODO should this be a tuple? don't want master equipment to be mutable. would also
+#      prevent liberal usage of deepcopy() when instantiating units
+all_equipment = {
+                 "Hand Weapon": Equipment(name="Hand Weapon", points=0, category="weapon"),
+                 "Spear": Equipment(name="Spear", points=0.5, category="weapon"),
+                 "Double-handed Weapon": Equipment(name="Double-handed Weapon", points=1, category="weapon"),
+                 "Shield": Equipment(name="Shield", points=0.5, category="armour"),
+                 "Light Armour": Equipment(name="Shield", points=0.5, category="armour")
+}
 
-            try:
-                index = int(index)
-                option = self.options[index]
-            except ValueError:
-                break
-            except IndexError:
-                break
-
-            if isinstance(option, Weapon):
-                self.troops.weapons = self.options[index]
-            elif isinstance(option, Armour):
-                self.troops.armour = self.options[index]
-
-            print(f"Equipped {option.name}\n")
+def select_from_all_equipment(selection: Union[str, List[str]], global_equipment: EquipmentDict=all_equipment) -> EquipmentDict:
+    """Get a selection from the global equipment"""
+    return {k: deepcopy(all_equipment[k]) for k in selection}
 
 
 # Model defaults
 clanrat = Model(
     name = "Clanrat Warrior",
     race = "Skaven",
-    troop_type = None,
     points = 7.5,
-    weapons = ["Hand Weapon"],
-    armour = ["Light Armour", "Shield"],
+    equipment = select_from_all_equipment(["Hand Weapon", "Shield", "Light Armour"]),
     profile = Profile(M=5, WS=3, BS=3, S=3, T=3, W=1, I=4, A=1, Ld=6, Int=6, Cl=5, WP=7)
 )
 
@@ -125,15 +128,13 @@ clanrats = Unit(
     min_models = 20,
     max_models = 40,
     troops = clanrat,
-    options = (
-        Weapon(name="Spears", points=0.5),
-        Weapon(name="Double-Handed Weapons", points=1)
-    )
+    troop_type = None,
+    options = select_from_all_equipment(["Spear", "Double-handed Weapon"])
 )
 
 # User-defined values
-clanrats.set_unit_size()
-clanrats.equip_troops()
+clanrats.set_unit_size(36)
+clanrats.equip_troops("Spear")
 
 # Convert to JSON string and save
 json_string = clanrats.model_dump_json(indent=2)
