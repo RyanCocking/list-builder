@@ -33,7 +33,9 @@ class MissileWeapon(Equipment):
     strength: str
     save_modifier: str
 
+
 EquipmentDict = Dict[str, Equipment]
+
 
 def equipment_from_data(filename) -> EquipmentDict | None:
     """Generate Equipment objects from input data"""
@@ -45,15 +47,17 @@ def equipment_from_data(filename) -> EquipmentDict | None:
     # validation test: all keys are identical to the corresponding Equipment.name
     return None
 
+
 class Model(BaseModel):
     """A single model"""
+
     name: str
     race: str
     points: float
     equipment: EquipmentDict  # modified by Unit
     profile: Profile
 
-    def set_equipment(self, equipment_name:str, equipment: Equipment):
+    def set_equipment(self, equipment_name: str, equipment: Equipment):
         self.equipment[equipment_name] = equipment
 
     def get_equipment(self):
@@ -62,6 +66,7 @@ class Model(BaseModel):
 
 class Unit(BaseModel):
     """A group of models"""
+
     name: str
     faction: str
     min_models: int
@@ -86,12 +91,16 @@ class Unit(BaseModel):
 
     def equip_troops(self, equipment_name: str):
         if not self._equipment_in_options(equipment_name):
-            raise ValueError(f"Equipment '{equipment_name}' not in options for unit '{self.name}'")
+            raise ValueError(
+                f"Equipment '{equipment_name}' not in options for unit '{self.name}'"
+            )
         self.troops.set_equipment(equipment_name, self.options[equipment_name])
 
     def unequip_troops(self, equipment_name: str):
         if not self._equipment_in_options(equipment_name):
-            raise ValueError(f"Equipment '{equipment_name}' not in options for unit '{self.name}'")
+            raise ValueError(
+                f"Equipment '{equipment_name}' not in options for unit '{self.name}'"
+            )
         self.troops.get_equipment().pop(equipment_name)
 
 
@@ -100,36 +109,39 @@ class Unit(BaseModel):
 # TODO should this be a tuple? don't want master equipment to be mutable. would also
 #      prevent liberal usage of deepcopy() when instantiating units
 all_equipment = {
-                 "Hand Weapon": Equipment(name="Hand Weapon", points=0, category="weapon"),
-                 "Spear": Equipment(name="Spear", points=0.5, category="weapon"),
-                 "Double-handed Weapon": Equipment(name="Double-handed Weapon", points=1, category="weapon"),
-                 "Shield": Equipment(name="Shield", points=0.5, category="armour"),
-                 "Light Armour": Equipment(name="Shield", points=0.5, category="armour")
+    "Hand Weapon": Equipment(name="Hand Weapon", points=0, category="weapon"),
+    "Spear": Equipment(name="Spear", points=0.5, category="weapon"),
+    "Double-handed Weapon": Equipment(name="Double-handed Weapon", points=1, category="weapon"),
+    "Shield": Equipment(name="Shield", points=0.5, category="armour"),
+    "Light Armour": Equipment(name="Shield", points=0.5, category="armour"),
 }
 
-def select_from_all_equipment(selection: Union[str, List[str]], global_equipment: EquipmentDict=all_equipment) -> EquipmentDict:
+
+def select_from_all_equipment(
+    selection: Union[str, List[str]], global_equipment: EquipmentDict = all_equipment
+) -> EquipmentDict:
     """Get a selection from the global equipment"""
     return {k: deepcopy(all_equipment[k]) for k in selection}
 
 
 # Model defaults
 clanrat = Model(
-    name = "Clanrat Warrior",
-    race = "Skaven",
-    points = 7.5,
-    equipment = select_from_all_equipment(["Hand Weapon", "Shield", "Light Armour"]),
-    profile = Profile(M=5, WS=3, BS=3, S=3, T=3, W=1, I=4, A=1, Ld=6, Int=6, Cl=5, WP=7)
+    name="Clanrat Warrior",
+    race="Skaven",
+    points=7.5,
+    equipment=select_from_all_equipment(["Hand Weapon", "Shield", "Light Armour"]),
+    profile=Profile(M=5, WS=3, BS=3, S=3, T=3, W=1, I=4, A=1, Ld=6, Int=6, Cl=5, WP=7),
 )
 
 # Unit defaults
 clanrats = Unit(
-    name = "Clanrat Warriors",
-    faction = "Skaven",
-    min_models = 20,
-    max_models = 40,
-    troops = clanrat,
-    troop_type = None,
-    options = select_from_all_equipment(["Spear", "Double-handed Weapon"])
+    name="Clanrat Warriors",
+    faction="Skaven",
+    min_models=20,
+    max_models=40,
+    troops=clanrat,
+    troop_type=None,
+    options=select_from_all_equipment(["Spear", "Double-handed Weapon"]),
 )
 
 # User-defined values
